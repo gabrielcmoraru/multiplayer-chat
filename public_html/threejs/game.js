@@ -4,6 +4,7 @@ class Game{
 
 		this.container;
 		this.player = { };
+        this.animations = {};
 		this.stats;
 		this.controls;
 		this.camera;
@@ -15,6 +16,7 @@ class Game{
 		document.body.appendChild( this.container );
 
 		const game = this;
+		this.anims = ['Pointing Gesture'];
 
 		this.assetsPath = '../assets/';
 
@@ -34,7 +36,7 @@ class Game{
 
 		this.scene = new THREE.Scene();
 		this.scene.background = new THREE.Color( 0xa0a0a0 );
-		this.scene.fog = new THREE.Fog( 0xa0a0a0, 200, 1000 );
+		this.scene.fog = new THREE.Fog( 0xa0a0a0, 700, 1800 );
 
 		let light = new THREE.HemisphereLight( 0xffffff, 0x444444 );
 		light.position.set( 0, 200, 0 );
@@ -50,13 +52,13 @@ class Game{
 		this.scene.add( light );
 
 		// ground
-		var mesh = new THREE.Mesh( new THREE.PlaneBufferGeometry( 2000, 2000 ), new THREE.MeshPhongMaterial( { color: 0x999999, depthWrite: false } ) );
+		var mesh = new THREE.Mesh( new THREE.PlaneBufferGeometry( 4000, 4000 ), new THREE.MeshPhongMaterial( { color: 0x999999, depthWrite: false } ) );
 		mesh.rotation.x = - Math.PI / 2;
 		//mesh.position.y = -100;
 		mesh.receiveShadow = true;
 		this.scene.add( mesh );
 
-		var grid = new THREE.GridHelper( 2000, 40, 0x000000, 0x000000 );
+		var grid = new THREE.GridHelper( 4000, 40, 0x000000, 0x000000 );
 		//grid.position.y = -100;
 		grid.material.opacity = 0.2;
 		grid.material.transparent = true;
@@ -76,17 +78,25 @@ class Game{
 
 			object.traverse( function ( child ) {
 				if ( child.isMesh ) {
-                    child.material.map = null;
 					child.castShadow = true;
 					child.receiveShadow = false;
 				}
 			} );
 
+            const tLoader = new THREE.TextureLoader();
+            tLoader.load(`${game.assetsPath}images/SimplePeople_FireFighter_Brown.png`, function(texture){
+				object.traverse( function ( child ) {
+					if ( child.isMesh ){
+						child.material.map = texture;
+					}
+				} );
+			});
+
 			game.scene.add(object);
 			game.player.object = object;
-			game.player.mixer.clipAction(object.animations[0]).play();
+			game.animations.Idle = object.animations[0];
 
-            game.animate();
+            game.loadNextAnim(loader);
 		} );
 
 		this.renderer = new THREE.WebGLRenderer( { antialias: true } );
@@ -102,6 +112,21 @@ class Game{
 		window.addEventListener( 'resize', function(){ game.onWindowResize(); }, false );
 	}
 
+    loadNextAnim(loader){
+		let anim = this.anims.pop();
+		const game = this;
+		loader.load( `${this.assetsPath}fbx/anims/${anim}.fbx`, function( object ){
+			game.animations[anim] = object.animations[0];
+			if (game.anims.length>0){
+				game.loadNextAnim(loader);
+			}else{
+				delete game.anims;
+				game.action = "Idle";
+				game.animate();
+			}
+		});
+	}
+
 	onWindowResize() {
 		this.camera.aspect = window.innerWidth / window.innerHeight;
 		this.camera.updateProjectionMatrix();
@@ -109,6 +134,31 @@ class Game{
 		this.renderer.setSize( window.innerWidth, window.innerHeight );
 
 	}
+
+    set action(name){
+		const action = this.player.mixer.clipAction( this.animations[name] );
+        action.time = 0;
+		this.player.mixer.stopAllAction();
+		this.player.action = name;
+		this.player.actionTime = Date.now();
+        this.player.actionName = name;
+
+		action.fadeIn(0.5);
+		action.play();
+	}
+
+    get action(){
+        if (this.player===undefined || this.player.actionName===undefined) return "";
+        return this.player.actionName;
+    }
+
+    toggleAnimation(){
+        if (game.action=="Idle"){
+            game.action = "Pointing Gesture";
+        }else{
+            game.action = "Idle";
+        }
+    }
 
 	animate() {
 		const game = this;
